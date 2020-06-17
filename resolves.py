@@ -32,6 +32,15 @@ def GetIpAddress(sHostName):
         dResolved [sIpAddress] = sIpAddress
     return dResolved
 
+def GetSrv(sSrvRecord):
+    try:
+        srv_records=dns.resolver.query(sSrvRecord, 'SRV')
+        for srv in srv_records:
+            sResolved = str(srv.target).rstrip('.')        
+        return sResolved
+    except:
+        return False
+    
 def GetCname(sHostName):
     try:
         aResults = dns.resolver.query(sHostName, 'CNAME')
@@ -50,6 +59,8 @@ parser.add_argument("-os", "--success", help="Define an output CSV file for succ
 parser.add_argument("-of", "--failed", help="Define an output file for FQDNs that failed to resolve.")
 parser.add_argument("-op", "--plain", help="Define an output file for succesfully resolved FQDNs. This file will contain only hostnames found.")
 parser.add_argument("-osr", "--soarecord", help="Define an output file for SOA records found.")
+parser.add_argument("-srv", "--srvrecord", help="Assume SRV when input starts with an underscore and try to resolve it as an SRV record.", action="store_true")
+parser.add_argument("-cname", "--cnamerecord", help="If a CNAME record is detected, try to resolve it as an CNAME record.", action="store_true")
 
 args = parser.parse_args()
 
@@ -73,9 +84,16 @@ for strInput in sys.stdin:
     sWildcardFqdn = sRandom + "." + strInput
     #print(sWildcardFqdn)
 
-    dIpAddressesRandom = GetIpAddress(sWildcardFqdn)
-    
     #print(strInput)
+    if args.srvrecord and strInput[0] == "_":
+        strInput = GetSrv(strInput)
+
+    if args.cnamerecord:
+        strInput2 = GetCname(strInput)
+        for sCname in strInput2:
+            print(sCname)
+        
+    dIpAddressesRandom = GetIpAddress(sWildcardFqdn)
     dIpAddresses = GetIpAddress(str(strInput))
     dCnames = GetCname(str(strInput))
     
@@ -83,16 +101,18 @@ for strInput in sys.stdin:
     if dIpAddressesRandom:
         #print ("Wildcard: "+strInput + ":" +str(dIpAddressesRandom))
         if not str(dIpAddressesRandom) in dRembemberdIpAddressesRandom:
-            sys.stdout.write(strInput + "\n")
-            if args.plain:
-                fPlain.write(strInput + " \n")
+            if strInput:
+                sys.stdout.write(strInput + "\n")
+                if args.plain:
+                    fPlain.write(strInput + " \n")
         dRembemberdIpAddressesRandom[str(dIpAddressesRandom)]=True
     else:
         if not dCnames or not args.nocname:
-            sys.stdout.write(strInput + "\n")
-            if args.plain:
-                fPlain.write(strInput + " \n")
-
+            if strInput:
+                sys.stdout.write(strInput + "\n")
+                if args.plain:
+                    fPlain.write(strInput + " \n")
+    
         #print(str(dIpAddresses))
     
     if args.success:
